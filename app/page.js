@@ -139,40 +139,84 @@ function Chat({ group, onBack }) {
   );
 }
 
+function Update({ item }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="card" onClick={() => setOpen(!open)} style={{ cursor: "pointer" }}>
+      <div className="row" style={{ justifyContent: "space-between" }}>
+        <span className="title ellipsis">{item.unread ? "● " : ""}{item.title}</span>
+        <span className="meta">{ago(item.at)}</span>
+      </div>
+      {item.author && <div className="meta ellipsis">{item.author}</div>}
+      <div className={open ? "meta" : "meta ellipsis"} style={{ whiteSpace: open ? "pre-wrap" : undefined }}>{item.text}</div>
+      <span className="chip">{item.source}{item.kind === "email" ? " · email" : ""}</span>
+      {open && (
+        <p style={{ marginBottom: 0 }}>
+          <a className="btn" href={item.openUrl} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}
+            style={{ textDecoration: "none", display: "inline-block" }}>
+            Reply in {item.source}
+          </a>
+        </p>
+      )}
+    </div>
+  );
+}
+
 function Messages() {
   const [groups, setGroups] = useState(null);
-  const [error, setError] = useState("");
+  const [gmError, setGmError] = useState("");
+  const [updates, setUpdates] = useState(null);
   const [open, setOpen] = useState(null);
 
   useEffect(() => {
-    getJSON("/api/groupme").then((b) => setGroups(b.groups)).catch((e) => setError(e.message));
+    if (open) return;
+    getJSON("/api/groupme").then((b) => setGroups(b.groups)).catch((e) => { setGroups([]); setGmError(e.message); });
+    getJSON("/api/notifications").then(setUpdates).catch((e) => setUpdates({ items: [], errors: [{ source: "Updates", error: e.message }] }));
   }, [open]);
 
   if (open) return <Chat group={open} onBack={() => setOpen(null)} />;
-  if (error) return <p className="err">GroupMe: {error}</p>;
-  if (!groups) return <p className="empty">Loading chats…</p>;
-  if (!groups.length) return <p className="empty">No GroupMe chats found.</p>;
+  if (!groups || !updates) return <p className="empty">Loading messages…</p>;
+
+  const feed = [
+    ...groups.map((g) => ({ ...g, kind: "groupme", at: g.lastAt })),
+    ...updates.items,
+  ].sort((a, b) => b.at.localeCompare(a.at));
+
   return (
     <div className="chatlist" style={{ marginTop: 12 }}>
-      {groups.map((g) => (
-        <div className="card" key={g.id} onClick={() => setOpen(g)}>
-          {g.image ? <img className="avatar" src={`${g.image}.avatar`} alt="" /> : <div className="avatar" />}
-          <div className="grow">
-            <div className="row" style={{ justifyContent: "space-between" }}>
-              <span className="title ellipsis">{g.name}</span>
-              <span className="meta">{ago(g.lastAt)}</span>
+      {gmError && <p className="err">GroupMe: {gmError}</p>}
+      {updates.errors?.map((e) => <p key={e.source} className="err">{e.source}: {e.error}</p>)}
+      {updates.teamsnap?.available && !updates.teamsnap.connected && (
+        <p><a className="btn" href="/api/teamsnap/connect" style={{ textDecoration: "none", display: "inline-block" }}>Connect TeamSnap</a></p>
+      )}
+      {updates.email === false && <p className="meta">Gmail isn't connected yet, so Heja and PlayMetrics updates won't show.</p>}
+      {!feed.length && <p className="empty">No messages yet.</p>}
+      {feed.map((item) =>
+        item.kind === "groupme" ? (
+          <div className="card" key={item.id} onClick={() => setOpen(item)}>
+            {item.image ? <img className="avatar" src={`${item.image}.avatar`} alt="" /> : <div className="avatar" />}
+            <div className="grow">
+              <div className="row" style={{ justifyContent: "space-between" }}>
+                <span className="title ellipsis">{item.name}</span>
+                <span className="meta">{ago(item.at)}</span>
+              </div>
+              <div className="meta ellipsis">{item.preview}</div>
+              <span className="chip">GroupMe</span>
             </div>
-            <div className="meta ellipsis">{g.preview}</div>
-            <span className="chip">GroupMe</span>
           </div>
-        </div>
-      ))}
+        ) : (
+          <Update key={item.id} item={item} />
+        )
+      )}
     </div>
   );
 }
 
 export default function Home() {
   const [tab, setTab] = useState("schedule");
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("tab") === "messages") setTab("messages");
+  }, []);
   return (
     <>
       <header className="top">

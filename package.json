@@ -8,6 +8,8 @@
     "start": "next start"
   },
   "dependencies": {
+    "imapflow": "^2.2.5",
+    "mailparser": "^3.9.36",
     "next": "16.3.8",
     "node-ical": "0.27.3",
     "react": "19.3.0",
