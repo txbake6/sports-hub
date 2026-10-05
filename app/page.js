@@ -77,20 +77,22 @@ function Schedule() {
   );
 }
 
+// A chat screen for any source whose API answers GET {messages} and POST {text} at one URL.
 function Chat({ group, onBack }) {
+  const url = group.chatUrl || `/api/groupme/${group.id}`;
   const [messages, setMessages] = useState(null);
   const [error, setError] = useState("");
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
 
   const load = () =>
-    getJSON(`/api/groupme/${group.id}`).then((b) => setMessages(b.messages)).catch((e) => setError(e.message));
+    getJSON(url).then((b) => setMessages(b.messages)).catch((e) => setError(e.message));
 
   useEffect(() => {
     load();
     const t = setInterval(load, 15000);
     return () => clearInterval(t);
-  }, [group.id]);
+  }, [url]);
 
   useEffect(() => {
     window.scrollTo(0, document.body.scrollHeight);
@@ -100,7 +102,7 @@ function Chat({ group, onBack }) {
     e.preventDefault();
     if (!text.trim()) return;
     setSending(true);
-    const res = await fetch(`/api/groupme/${group.id}`, {
+    const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text }),
