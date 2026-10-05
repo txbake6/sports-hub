@@ -5,6 +5,9 @@ One private page with every team's schedule and chats (Heja, GroupMe, PlayMetric
 ## What works today
 - **Schedule:** merges every team calendar link into one list, grouped by day, with filters per team.
 - **Messages:** GroupMe chats, with replies sent from here.
+- **Heja:** team posts and comments, with replies, by signing in as you (Messages tab > Connect Heja). Heja has no public API, so this uses the same private connection as web.heja.io and can break when Heja updates.
+- **TeamSnap:** messages through TeamSnap's official API (Connect TeamSnap).
+- **Email backup:** TeamSnap, PlayMetrics and Heja notification emails from Gmail, if set up.
 - **Password gate:** the whole app sits behind `APP_PASSWORD`.
 
 ## Setup
