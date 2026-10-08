@@ -41,3 +41,5 @@ h1 { font-size: 20px; margin: 0 0 10px; }
 .link { background: none; border: 0; color: var(--accent); cursor: pointer; padding: 0; }
 .login { max-width: 340px; margin: 18vh auto; padding: 0 16px; }
 .login input { width: 100%; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--text); margin: 10px 0; }
+
+a { color: var(--accent); }
