@@ -26,6 +26,7 @@ function Schedule() {
   const [error, setError] = useState("");
   const [hidden, setHidden] = useState([]);
   const [showPast, setShowPast] = useState(false);
+  const [teamsOpen, setTeamsOpen] = useState(false);
 
   useEffect(() => {
     getJSON("/api/schedule").then(setData).catch((e) => setError(e.message));
@@ -49,7 +50,15 @@ function Schedule() {
 
   return (
     <>
-      <div className="filters">
+      <button className="teams-toggle" onClick={() => setTeamsOpen(!teamsOpen)} aria-expanded={teamsOpen}>
+        <span>{teamsOpen ? "▾" : "▸"} Teams</span>
+        <span className="meta">
+          {hidden.length ? `${data.sources.length - hidden.length} of ${data.sources.length} shown` : `All ${data.sources.length}`}
+          {" "}
+          {data.sources.filter((s) => !hidden.includes(s)).map((s) => styleFor(s, data.styles).icon).join("")}
+        </span>
+      </button>
+      {teamsOpen && <div className="filters">
         {data.sources.map((s) => {
           const st = styleFor(s, data.styles);
           const on = !hidden.includes(s);
@@ -61,7 +70,7 @@ function Schedule() {
           );
         })}
         <button className={showPast ? "on" : ""} onClick={() => setShowPast(!showPast)}>Past week</button>
-      </div>
+      </div>}
       {data.errors.map((e) => (
         <p key={e.source} className="err">Couldn't load {e.source}: {e.error}</p>
       ))}
@@ -157,13 +166,13 @@ function Chat({ group, onBack }) {
   );
 }
 
-function Update({ item }) {
+function Update({ item, onOpen }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="card" onClick={() => setOpen(!open)} style={{ cursor: "pointer" }}>
+    <div className={`card${item.isNew ? " new" : ""}`} onClick={() => { if (!open) onOpen?.(); setOpen(!open); }} style={{ cursor: "pointer", display: "block" }}>
       <div className="row" style={{ justifyContent: "space-between" }}>
-        <span className="title ellipsis">{item.unread ? "● " : ""}{item.title}</span>
-        <span className="meta">{ago(item.at)}</span>
+        <span className="title ellipsis">{item.isNew && <span className="dot" aria-label="New" />}{item.title}</span>
+        <span className="meta when">{item.isNew ? <b className="newtag">NEW</b> : null} {item.at > "2000" ? ago(item.at) : ""}</span>
       </div>
       {item.author && <div className="meta ellipsis">{item.author}</div>}
       <div className={open ? "meta" : "meta ellipsis"} style={{ whiteSpace: open ? "pre-wrap" : undefined }}>{item.text}</div>
@@ -349,6 +358,7 @@ function Messages() {
   const [ts1, setTs1] = useState(null);
   const [open, setOpen] = useState(null);
   const [reload, setReload] = useState(0);
+  const [seen, setSeen] = useState(null);
 
   useEffect(() => {
     if (open) return;
@@ -358,11 +368,23 @@ function Messages() {
     getJSON("/api/playmetrics").then(setPm).catch((e) => setPm({ connected: false, items: [], error: e.message }));
     getJSON("/api/groupme").then((b) => setGroups(b.groups)).catch((e) => { setGroups([]); setGmError(e.message); });
     getJSON("/api/notifications").then(setUpdates).catch((e) => setUpdates({ items: [], errors: [{ source: "Updates", error: e.message }] }));
+    getJSON("/api/seen").then(setSeen).catch(() => setSeen({ baseline: new Date().toISOString(), seen: {} }));
   }, [open, reload]);
 
-  if (open?.kind === "heja") return <HejaPost item={open} onBack={() => setOpen(null)} />;
-  if (open) return <Chat group={open} onBack={() => setOpen(null)} />;
-  if (!groups || !updates || !heja || !pm || !rm || !ts1) return <p className="empty">Loading messages…</p>;
+  // Opening something marks it read (on every device). Leaving marks it again, so a reply you just
+  // sent doesn't make the chat look new.
+  const markSeen = (item) => postJSON("/api/seen", { id: item.id }).then(setSeen).catch(() => {});
+  const openItem = (item) => { markSeen(item); setOpen(item); };
+  const close = () => { markSeen(open); setOpen(null); };
+  if (open?.kind === "heja") return <HejaPost item={open} onBack={close} />;
+  if (open) return <Chat group={open} onBack={close} />;
+  if (!groups || !updates || !heja || !pm || !rm || !ts1 || !seen) return <p className="empty">Loading messages…</p>;
+
+  const isNew = (item) => {
+    const last = seen.seen[item.id];
+    if (last) return item.at > last;
+    return Boolean(item.unread) || item.at > seen.baseline;
+  };
 
   const feed = [
     ...groups.map((g) => ({ ...g, kind: "groupme", at: g.lastAt })),
@@ -371,7 +393,11 @@ function Messages() {
     ...(pm.items || []),
     ...(rm.items || []),
     ...(ts1.items || []),
-  ].sort((a, b) => b.at.localeCompare(a.at));
+  ]
+    .map((item) => ({ ...item, isNew: isNew(item) }))
+    // New messages first, then everything else, newest first within each.
+    .sort((a, b) => (b.isNew - a.isNew) || b.at.localeCompare(a.at));
+  const newCount = feed.filter((i) => i.isNew).length;
 
   return (
     <div className="chatlist" style={{ marginTop: 12 }}>
@@ -382,31 +408,32 @@ function Messages() {
       {rm.error && <p className="err">Remind: {rm.error}</p>}
       {ts1.error && <p className="err">TeamSnap ONE: {ts1.error}</p>}
       {!feed.length && <p className="empty">No messages yet. Connect your apps in the Setup tab.</p>}
+      {feed.length > 0 && <div className="day">{newCount ? `${newCount} new` : "All caught up"}</div>}
       {feed.map((item) =>
         item.kind === "groupme" || item.kind === "playmetrics" || item.kind === "remind" || item.kind === "teamsnapone" ? (
-          <div className="card" key={item.id} onClick={() => setOpen(item)}>
+          <div className={`card${item.isNew ? " new" : ""}`} key={item.id} onClick={() => openItem(item)}>
             {item.image ? <img className="avatar" src={`${item.image}.avatar`} alt="" /> : <div className="avatar" />}
             <div className="grow">
               <div className="row" style={{ justifyContent: "space-between" }}>
-                <span className="title ellipsis">{item.name}</span>
-                <span className="meta">{ago(item.at)}</span>
+                <span className="title ellipsis">{item.isNew && <span className="dot" aria-label="New" />}{item.name}</span>
+                <span className="meta when">{item.isNew ? <b className="newtag">NEW</b> : null} {item.at > "2000" ? ago(item.at) : ""}</span>
               </div>
               <div className="meta ellipsis">{item.preview}</div>
               <span className="chip">{item.source || "GroupMe"}</span>
             </div>
           </div>
         ) : item.kind === "heja" ? (
-          <div className="card" key={item.id} onClick={() => setOpen(item)} style={{ cursor: "pointer", display: "block" }}>
+          <div className={`card${item.isNew ? " new" : ""}`} key={item.id} onClick={() => openItem(item)} style={{ cursor: "pointer", display: "block" }}>
             <div className="row" style={{ justifyContent: "space-between" }}>
-              <span className="title ellipsis">{item.title}</span>
-              <span className="meta">{ago(item.at)}</span>
+              <span className="title ellipsis">{item.isNew && <span className="dot" aria-label="New" />}{item.title}</span>
+              <span className="meta when">{item.isNew ? <b className="newtag">NEW</b> : null} {item.at > "2000" ? ago(item.at) : ""}</span>
             </div>
             <div className="meta ellipsis">{item.author}: {item.text}</div>
             {item.lastComment && <div className="meta ellipsis">↳ {item.lastComment}</div>}
             <span className="chip">Heja</span>
           </div>
         ) : (
-          <Update key={item.id} item={item} />
+          <Update key={item.id} item={item} onOpen={() => markSeen(item)} />
         )
       )}
     </div>

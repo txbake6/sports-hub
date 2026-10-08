@@ -48,3 +48,9 @@ a { color: var(--accent); }
 .event.cancelled .title { text-decoration: line-through; opacity: .7; }
 .badge { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 16px; flex: none; }
 .tag { display: inline-block; font-size: 11px; font-weight: 600; padding: 0 6px; margin-left: 6px; border-radius: 6px; border: 1px solid var(--line); color: var(--muted); vertical-align: 2px; }
+
+.teams-toggle { display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 10px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--text); font-size: 14px; font-weight: 600; cursor: pointer; }
+.card.new { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); margin-right: 6px; vertical-align: 1px; }
+.newtag { font-size: 10px; letter-spacing: .04em; color: #fff; background: var(--accent); padding: 1px 5px; border-radius: 5px; }
+.when { white-space: nowrap; flex: none; }
