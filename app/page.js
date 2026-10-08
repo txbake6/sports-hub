@@ -216,16 +216,23 @@ function ConnectWithPassword({ app, url, note, onDone }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [code, setCode] = useState(null); // set when the app asks for an emailed code
   async function submit(e) {
     e.preventDefault();
     setBusy(true);
     setError("");
     try {
-      await postJSON(url, { email, password });
-      setPassword("");
-      onDone();
+      const r = await postJSON(url, code === null ? { email, password } : { email, password, code });
+      if (r.needsCode) {
+        setCode("");
+      } else {
+        setPassword("");
+        setCode(null);
+        onDone();
+      }
     } catch (err) {
       setError(err.message);
+      if (/expired/i.test(err.message)) setCode(null);
     }
     setBusy(false);
   }
@@ -238,9 +245,19 @@ function ConnectWithPassword({ app, url, note, onDone }) {
         <input style={box} type="email" autoComplete="username" placeholder={`${app} email`} value={email} onChange={(e) => setEmail(e.target.value)} />
         <div className="row">
           <input className="grow" style={box} type="password" autoComplete="current-password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} />
-          <button className="btn" disabled={busy || !email || !password}>{busy ? "Connecting…" : "Connect"}</button>
+          <button className="btn" disabled={busy || !email || !password || code !== null}>{busy ? "Connecting…" : "Connect"}</button>
         </div>
       </div>
+      {code !== null && (
+        <div style={{ marginTop: 8 }}>
+          <div className="meta">{app} wants to confirm this new device. Enter the 4-digit code it just emailed you.</div>
+          <div className="row" style={{ marginTop: 6 }}>
+            <input className="grow" style={box} inputMode="numeric" autoComplete="one-time-code" placeholder="0000" value={code} onChange={(e) => setCode(e.target.value)} />
+            <button className="btn" type="submit" disabled={busy || !/^\d{4,8}$/.test(code.trim())}>{busy ? "Checking…" : "Confirm"}</button>
+          </div>
+          <button className="link" type="button" onClick={() => { setCode(null); setError(""); }}>Start over</button>
+        </div>
+      )}
       {error && <p className="err">{error}</p>}
     </form>
   );
@@ -490,8 +507,7 @@ function Setup() {
           <button className="link" onClick={async () => { await fetch("/api/remind", { method: "DELETE" }); load(); }}>Disconnect</button></div>
           <div className="meta">Chats and class announcements</div></div>
       ) : (
-        <ConnectWithPassword app="Remind" url="/api/remind" onDone={load}
-          note="If you sign in to Remind with Google, set a Remind password first with Forgot password on remind.com." />
+        <ConnectWithPassword app="Remind" url="/api/remind" onDone={load} />
       )}
       {s.teamsnap.available && (
         <div className="card">
