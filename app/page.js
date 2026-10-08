@@ -313,12 +313,14 @@ function Messages() {
   const [heja, setHeja] = useState(null);
   const [pm, setPm] = useState(null);
   const [rm, setRm] = useState(null);
+  const [ts1, setTs1] = useState(null);
   const [open, setOpen] = useState(null);
   const [reload, setReload] = useState(0);
 
   useEffect(() => {
     if (open) return;
     getJSON("/api/heja").then(setHeja).catch((e) => setHeja({ connected: false, items: [], error: e.message }));
+    getJSON("/api/teamsnapone").then(setTs1).catch((e) => setTs1({ connected: false, items: [], error: e.message }));
     getJSON("/api/remind").then(setRm).catch((e) => setRm({ connected: false, items: [], error: e.message }));
     getJSON("/api/playmetrics").then(setPm).catch((e) => setPm({ connected: false, items: [], error: e.message }));
     getJSON("/api/groupme").then((b) => setGroups(b.groups)).catch((e) => { setGroups([]); setGmError(e.message); });
@@ -327,7 +329,7 @@ function Messages() {
 
   if (open?.kind === "heja") return <HejaPost item={open} onBack={() => setOpen(null)} />;
   if (open) return <Chat group={open} onBack={() => setOpen(null)} />;
-  if (!groups || !updates || !heja || !pm || !rm) return <p className="empty">Loading messages…</p>;
+  if (!groups || !updates || !heja || !pm || !rm || !ts1) return <p className="empty">Loading messages…</p>;
 
   const feed = [
     ...groups.map((g) => ({ ...g, kind: "groupme", at: g.lastAt })),
@@ -335,6 +337,7 @@ function Messages() {
     ...(heja.items || []),
     ...(pm.items || []),
     ...(rm.items || []),
+    ...(ts1.items || []),
   ].sort((a, b) => b.at.localeCompare(a.at));
 
   return (
@@ -344,9 +347,10 @@ function Messages() {
       {heja.error && heja.connected !== false && <p className="err">Heja: {heja.error}</p>}
       {pm.error && <p className="err">PlayMetrics: {pm.error}</p>}
       {rm.error && <p className="err">Remind: {rm.error}</p>}
+      {ts1.error && <p className="err">TeamSnap ONE: {ts1.error}</p>}
       {!feed.length && <p className="empty">No messages yet. Connect your apps in the Setup tab.</p>}
       {feed.map((item) =>
-        item.kind === "groupme" || item.kind === "playmetrics" || item.kind === "remind" ? (
+        item.kind === "groupme" || item.kind === "playmetrics" || item.kind === "remind" || item.kind === "teamsnapone" ? (
           <div className="card" key={item.id} onClick={() => setOpen(item)}>
             {item.image ? <img className="avatar" src={`${item.image}.avatar`} alt="" /> : <div className="avatar" />}
             <div className="grow">
@@ -473,6 +477,13 @@ function Setup() {
           <div className="meta">Team chats, club messages and team calendars</div></div>
       ) : (
         <ConnectWithPassword app="PlayMetrics" url="/api/playmetrics" onDone={load} />
+      )}
+      {s.teamsnapone ? (
+        <div className="card"><div className="row" style={{ justifyContent: "space-between" }}><span className="title">TeamSnap ONE</span>
+          <button className="link" onClick={async () => { await fetch("/api/teamsnapone", { method: "DELETE" }); load(); }}>Disconnect</button></div>
+          <div className="meta">Team chats and schedule</div></div>
+      ) : (
+        <ConnectWithPassword app="TeamSnap ONE" url="/api/teamsnapone" onDone={load} />
       )}
       {s.remind ? (
         <div className="card"><div className="row" style={{ justifyContent: "space-between" }}><span className="title">Remind</span>
