@@ -211,6 +211,41 @@ function ConnectHeja({ onDone }) {
   );
 }
 
+function ConnectPlaymetrics({ onDone }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  async function submit(e) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      await postJSON("/api/playmetrics", { email, password });
+      setPassword("");
+      onDone();
+    } catch (err) {
+      setError(err.message);
+    }
+    setBusy(false);
+  }
+  const box = { padding: "8px 10px", borderRadius: 10, border: "1px solid var(--line)", background: "var(--card)", color: "var(--text)", minWidth: 0 };
+  return (
+    <form className="card" onSubmit={submit}>
+      <div className="title">Connect PlayMetrics</div>
+      <div className="meta">Sign in with your PlayMetrics email and password. The password is only used to sign in and isn't saved.</div>
+      <div style={{ display: "grid", gap: 6, marginTop: 8 }}>
+        <input style={box} type="email" autoComplete="username" placeholder="PlayMetrics email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <div className="row">
+          <input className="grow" style={box} type="password" autoComplete="current-password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} />
+          <button className="btn" disabled={busy || !email || !password}>{busy ? "Connecting…" : "Connect"}</button>
+        </div>
+      </div>
+      {error && <p className="err">{error}</p>}
+    </form>
+  );
+}
+
 function HejaPost({ item, onBack }) {
   const [post, setPost] = useState(null);
   const [error, setError] = useState("");
@@ -276,24 +311,27 @@ function Messages() {
   const [gmError, setGmError] = useState("");
   const [updates, setUpdates] = useState(null);
   const [heja, setHeja] = useState(null);
+  const [pm, setPm] = useState(null);
   const [open, setOpen] = useState(null);
   const [reload, setReload] = useState(0);
 
   useEffect(() => {
     if (open) return;
     getJSON("/api/heja").then(setHeja).catch((e) => setHeja({ connected: false, items: [], error: e.message }));
+    getJSON("/api/playmetrics").then(setPm).catch((e) => setPm({ connected: false, items: [], error: e.message }));
     getJSON("/api/groupme").then((b) => setGroups(b.groups)).catch((e) => { setGroups([]); setGmError(e.message); });
     getJSON("/api/notifications").then(setUpdates).catch((e) => setUpdates({ items: [], errors: [{ source: "Updates", error: e.message }] }));
   }, [open, reload]);
 
   if (open?.kind === "heja") return <HejaPost item={open} onBack={() => setOpen(null)} />;
   if (open) return <Chat group={open} onBack={() => setOpen(null)} />;
-  if (!groups || !updates || !heja) return <p className="empty">Loading messages…</p>;
+  if (!groups || !updates || !heja || !pm) return <p className="empty">Loading messages…</p>;
 
   const feed = [
     ...groups.map((g) => ({ ...g, kind: "groupme", at: g.lastAt })),
     ...updates.items,
     ...(heja.items || []),
+    ...(pm.items || []),
   ].sort((a, b) => b.at.localeCompare(a.at));
 
   return (
@@ -301,9 +339,10 @@ function Messages() {
       {gmError && <p className="err">GroupMe: {gmError}</p>}
       {updates.errors?.map((e) => <p key={e.source} className="err">{e.source}: {e.error}</p>)}
       {heja.error && heja.connected !== false && <p className="err">Heja: {heja.error}</p>}
+      {pm.error && <p className="err">PlayMetrics: {pm.error}</p>}
       {!feed.length && <p className="empty">No messages yet. Connect your apps in the Setup tab.</p>}
       {feed.map((item) =>
-        item.kind === "groupme" ? (
+        item.kind === "groupme" || item.kind === "playmetrics" ? (
           <div className="card" key={item.id} onClick={() => setOpen(item)}>
             {item.image ? <img className="avatar" src={`${item.image}.avatar`} alt="" /> : <div className="avatar" />}
             <div className="grow">
@@ -312,7 +351,7 @@ function Messages() {
                 <span className="meta">{ago(item.at)}</span>
               </div>
               <div className="meta ellipsis">{item.preview}</div>
-              <span className="chip">GroupMe</span>
+              <span className="chip">{item.kind === "playmetrics" ? "PlayMetrics" : "GroupMe"}</span>
             </div>
           </div>
         ) : item.kind === "heja" ? (
@@ -424,10 +463,13 @@ function Setup() {
         <ConnectHeja onDone={load} />
       )}
       <ConnectGroupMe connected={s.groupme} onChange={setS} />
-      <div className="card">
-        <div className="row" style={{ justifyContent: "space-between" }}><span className="title">PlayMetrics</span><span className="meta">Coming next</span></div>
-        <div className="meta">Team chat is built. Sign-in comes once the second recording arrives.</div>
-      </div>
+      {s.playmetrics ? (
+        <div className="card"><div className="row" style={{ justifyContent: "space-between" }}><span className="title">PlayMetrics</span>
+          <button className="link" onClick={async () => { await fetch("/api/playmetrics", { method: "DELETE" }); load(); }}>Disconnect</button></div>
+          <div className="meta">Team chats, club messages and team calendars</div></div>
+      ) : (
+        <ConnectPlaymetrics onDone={load} />
+      )}
       {s.teamsnap.available && (
         <div className="card">
           <div className="row" style={{ justifyContent: "space-between" }}><span className="title">TeamSnap</span><span className="meta">{s.teamsnap.connected ? "Connected" : "Not connected"}</span></div>

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { loadSchedule } from "../../../lib/schedule";
 import { readSettings } from "../../../lib/settings";
 import { HEJA_COOKIE, ensureToken, loadHejaActivities } from "../../../lib/heja";
+import { PM_COOKIE, ensurePlaymetrics, playmetricsCalendars } from "../../../lib/playmetrics";
 import { vaultGet, vaultSet } from "../../../lib/vault";
 
 export const dynamic = "force-dynamic";
@@ -10,9 +11,19 @@ export const dynamic = "force-dynamic";
 export async function GET(req) {
   const { feeds } = await readSettings(req);
   const hejaSaved = await vaultGet(req, HEJA_COOKIE);
+  const pmSaved = await vaultGet(req, PM_COOKIE);
   let hejaSession = null;
+  let pmSession = null;
+  let pmError = null;
+  // PlayMetrics publishes a calendar link per team; add them alongside the ones from Setup.
+  const pmFeeds = pmSaved
+    ? await ensurePlaymetrics(pmSaved)
+        .then((s) => { pmSession = s; return playmetricsCalendars(s); })
+        .catch((e) => { pmError = e.message; return []; })
+    : [];
+  const known = new Set(feeds.map((f) => f.url));
   const [schedule, heja] = await Promise.all([
-    loadSchedule({ extraFeeds: feeds.map((f) => ({ ...f })) }),
+    loadSchedule({ extraFeeds: [...feeds.map((f) => ({ ...f })), ...pmFeeds.filter((f) => !known.has(f.url))] }),
     hejaSaved
       ? ensureToken(hejaSaved)
           .then((s) => {
@@ -30,7 +41,9 @@ export async function GET(req) {
     schedule.sources.push(...(names.length ? names : ["Heja"]));
     if (heja.error) schedule.errors.push({ source: "Heja", error: heja.error });
   }
+  if (pmError) schedule.errors.push({ source: "PlayMetrics", error: pmError });
   const res = NextResponse.json(schedule);
   if (hejaSession) await vaultSet(res, HEJA_COOKIE, hejaSession);
+  if (pmSession && pmSession !== pmSaved) await vaultSet(res, PM_COOKIE, pmSession);
   return res;
 }

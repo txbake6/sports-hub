@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { checkToken } from "../../../lib/groupme";
 import { readSettings, writeSettings } from "../../../lib/settings";
 import { HEJA_COOKIE } from "../../../lib/heja";
+import { PM_COOKIE } from "../../../lib/playmetrics";
 import { TS_COOKIE, teamsnapConfigured } from "../../../lib/teamsnap";
 import { sharedStorage, vaultGet } from "../../../lib/vault";
 
@@ -13,6 +14,7 @@ async function summary(req, s) {
     feeds: s.feeds,
     groupme: Boolean(process.env.GROUPME_TOKEN || s.groupmeToken),
     heja: Boolean(await vaultGet(req, HEJA_COOKIE)),
+    playmetrics: Boolean(await vaultGet(req, PM_COOKIE)),
     teamsnap: { available: teamsnapConfigured(), connected: Boolean(await vaultGet(req, TS_COOKIE)) },
   };
 }
