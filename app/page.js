@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { ICONS, isGame, styleFor } from "../lib/styles";
 
 const dayFmt = new Intl.DateTimeFormat(undefined, { weekday: "long", month: "short", day: "numeric" });
 const timeFmt = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
@@ -49,9 +50,16 @@ function Schedule() {
   return (
     <>
       <div className="filters">
-        {data.sources.map((s) => (
-          <button key={s} className={hidden.includes(s) ? "" : "on"} onClick={() => toggle(s)}>{s}</button>
-        ))}
+        {data.sources.map((s) => {
+          const st = styleFor(s, data.styles);
+          const on = !hidden.includes(s);
+          return (
+            <button key={s} className={on ? "on" : ""} onClick={() => toggle(s)}
+              style={on ? { background: st.color, borderColor: st.color, color: "#fff" } : { borderColor: st.color }}>
+              {st.icon} {s}
+            </button>
+          );
+        })}
         <button className={showPast ? "on" : ""} onClick={() => setShowPast(!showPast)}>Past week</button>
       </div>
       {data.errors.map((e) => (
@@ -61,16 +69,24 @@ function Schedule() {
       {byDay.map((d) => (
         <section key={d.label}>
           <div className="day">{d.label}</div>
-          {d.items.map((ev) => (
-            <div className="card row" key={ev.id}>
-              <div className="time">{ev.allDay ? "All day" : timeFmt.format(new Date(ev.start))}</div>
-              <div className="grow">
-                <div className="title">{ev.title}</div>
-                {ev.location && <div className="meta">{ev.location}</div>}
-                <span className="chip">{ev.source}</span>
+          {d.items.map((ev) => {
+            const st = styleFor(ev.source, data.styles);
+            return (
+              <div className={`card row event${ev.cancelled ? " cancelled" : ""}`} key={ev.id} style={{ borderLeftColor: st.color }}>
+                <div className="time">{ev.allDay ? "All day" : timeFmt.format(new Date(ev.start))}</div>
+                <div className="badge" style={{ background: st.color }} aria-hidden>{st.icon}</div>
+                <div className="grow">
+                  <div className="title">
+                    {ev.title}
+                    {isGame(ev.title) && <span className="tag" style={{ background: st.color, borderColor: st.color, color: "#fff" }}>Game</span>}
+                    {ev.cancelled && <span className="tag">Cancelled</span>}
+                  </div>
+                  {ev.location && <div className="meta">{ev.location}</div>}
+                  <span className="chip" style={{ borderColor: st.color }}>{ev.source}</span>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </section>
       ))}
     </>
@@ -436,7 +452,7 @@ function ConnectGroupMe({ connected, onChange }) {
   );
 }
 
-function CalendarLinks({ feeds, onChange }) {
+function CalendarLinks({ feeds, uploads = [], onChange }) {
   const [url, setUrl] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -465,7 +481,66 @@ function CalendarLinks({ feeds, onChange }) {
         <input className="grow" style={inputStyle} placeholder="webcal:// or https:// link" value={url} onChange={(e) => setUrl(e.target.value)} />
         <button className="btn" disabled={busy || !url.trim()}>Add</button>
       </form>
+      <div className="meta" style={{ marginTop: 12 }}>Or upload an .ics file. An upload is a snapshot, so upload it again when the schedule changes. A link stays up to date by itself.</div>
+      {uploads.map((u) => (
+        <div className="row" key={u.id} style={{ justifyContent: "space-between", marginTop: 6 }}>
+          <span className="meta ellipsis grow">📎 {u.name}</span>
+          <button className="link" disabled={busy} onClick={async () => { await fetch(`/api/calendars?id=${encodeURIComponent(u.id)}`, { method: "DELETE" }); onChange(await getJSON("/api/settings")); }}>Remove</button>
+        </div>
+      ))}
+      <label className="btn" style={{ display: "inline-block", marginTop: 8, cursor: "pointer" }}>
+        {busy ? "Uploading…" : "Upload .ics file"}
+        <input type="file" accept=".ics,text/calendar" multiple hidden disabled={busy} onChange={async (e) => {
+          const files = [...e.target.files];
+          e.target.value = "";
+          setBusy(true);
+          setError("");
+          try {
+            for (const f of files) await postJSON("/api/calendars", { name: f.name, ics: await f.text() });
+            onChange(await getJSON("/api/settings"));
+          } catch (err) {
+            setError(err.message);
+          }
+          setBusy(false);
+        }} />
+      </label>
       {error && <p className="err">{error}</p>}
+    </div>
+  );
+}
+
+// Pick the color and icon for each schedule. Changes save right away and show on every device.
+function ScheduleColors({ styles, onChange }) {
+  const [sources, setSources] = useState(null);
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (open && !sources) getJSON("/api/schedule").then((d) => setSources(d.sources)).catch(() => setSources([]));
+  }, [open]);
+  async function save(body) {
+    try { onChange(await postJSON("/api/settings", body)); } catch {}
+  }
+  return (
+    <div className="card">
+      <div className="row" style={{ justifyContent: "space-between" }}>
+        <span className="title">Schedule colors and icons</span>
+        <button className="link" onClick={() => setOpen(!open)}>{open ? "Done" : "Change"}</button>
+      </div>
+      {!open && <div className="meta">Each team gets its own color and icon on the Schedule.</div>}
+      {open && !sources && <p className="empty">Loading…</p>}
+      {open && sources?.map((src) => {
+        const st = styleFor(src, styles);
+        return (
+          <div key={src} className="row" style={{ marginTop: 8, gap: 8 }}>
+            <input type="color" value={st.color} aria-label={`Color for ${src}`} onChange={(e) => save({ setStyle: { source: src, color: e.target.value } })}
+              style={{ width: 36, height: 32, padding: 0, border: "none", background: "none" }} />
+            <select value={st.icon} aria-label={`Icon for ${src}`} onChange={(e) => save({ setStyle: { source: src, icon: e.target.value } })} style={inputStyle}>
+              {[...new Set([st.icon, ...ICONS])].map((i) => <option key={i} value={i}>{i}</option>)}
+            </select>
+            <span className="meta ellipsis grow">{src}</span>
+            {styles[src] && <button className="link" onClick={() => save({ resetStyle: src })}>Reset</button>}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -515,7 +590,8 @@ function Setup() {
           {!s.teamsnap.connected && <p style={{ margin: "6px 0 0" }}><a className="btn" href="/api/teamsnap/connect" style={{ textDecoration: "none", display: "inline-block" }}>Connect TeamSnap</a></p>}
         </div>
       )}
-      <CalendarLinks feeds={s.feeds} onChange={setS} />
+      <CalendarLinks feeds={s.feeds} uploads={s.uploads} onChange={setS} />
+      <ScheduleColors styles={s.styles || {}} onChange={setS} />
     </div>
   );
 }

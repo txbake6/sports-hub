@@ -43,3 +43,8 @@ h1 { font-size: 20px; margin: 0 0 10px; }
 .login input { width: 100%; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--text); margin: 10px 0; }
 
 a { color: var(--accent); }
+
+.event { border-left: 4px solid var(--line); align-items: flex-start; }
+.event.cancelled .title { text-decoration: line-through; opacity: .7; }
+.badge { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: 16px; flex: none; }
+.tag { display: inline-block; font-size: 11px; font-weight: 600; padding: 0 6px; margin-left: 6px; border-radius: 6px; border: 1px solid var(--line); color: var(--muted); vertical-align: 2px; }
