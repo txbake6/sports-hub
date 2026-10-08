@@ -415,7 +415,7 @@ function Setup() {
   if (!s) return <p className="empty">Loading…</p>;
   return (
     <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
-      <p className="meta" style={{ margin: 0 }}>Connect each app once on this phone or computer. Your sign-ins stay saved in this browser.</p>
+      <p className="meta" style={{ margin: 0 }}>{s.synced ? "Connect each app once. Your phone and computer share these connections." : "Connect each app once on this phone or computer. Your sign-ins stay saved in this browser."}</p>
       {s.heja ? (
         <div className="card"><div className="row" style={{ justifyContent: "space-between" }}><span className="title">Heja</span>
           <button className="link" onClick={async () => { await fetch("/api/heja", { method: "DELETE" }); load(); }}>Disconnect</button></div>

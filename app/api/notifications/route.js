@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { emailConfigured, loadNotifications } from "../../../lib/email";
-import { TS_COOKIE, loadTeamsnapMessages, openToken, teamsnapConfigured } from "../../../lib/teamsnap";
+import { TS_COOKIE, loadTeamsnapMessages, teamsnapConfigured } from "../../../lib/teamsnap";
+import { vaultGet } from "../../../lib/vault";
 
 export const dynamic = "force-dynamic";
 
@@ -8,8 +9,7 @@ export const dynamic = "force-dynamic";
 // notification emails from TeamSnap, PlayMetrics and Heja.
 export async function GET(req) {
   const errors = [];
-  const sealed = req.cookies.get(TS_COOKIE)?.value;
-  const token = sealed ? openToken(sealed) : null;
+  const token = await vaultGet(req, TS_COOKIE);
   const [emails, teamsnap] = await Promise.all([
     loadNotifications().catch((e) => (errors.push({ source: "Gmail", error: e.message }), [])),
     token

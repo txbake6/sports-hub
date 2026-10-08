@@ -2,14 +2,14 @@ import { NextResponse } from "next/server";
 import { loadSchedule } from "../../../lib/schedule";
 import { readSettings } from "../../../lib/settings";
 import { HEJA_COOKIE, ensureToken, loadHejaActivities } from "../../../lib/heja";
-import { cookieOpts, seal, unseal } from "../../../lib/seal";
+import { vaultGet, vaultSet } from "../../../lib/vault";
 
 export const dynamic = "force-dynamic";
 
 // Calendar links (built-in and ones added in Setup) plus Heja's schedule straight from Heja.
 export async function GET(req) {
-  const { feeds } = readSettings(req);
-  const hejaSaved = unseal(req.cookies.get(HEJA_COOKIE)?.value);
+  const { feeds } = await readSettings(req);
+  const hejaSaved = await vaultGet(req, HEJA_COOKIE);
   let hejaSession = null;
   const [schedule, heja] = await Promise.all([
     loadSchedule({ extraFeeds: feeds.map((f) => ({ ...f })) }),
@@ -31,6 +31,6 @@ export async function GET(req) {
     if (heja.error) schedule.errors.push({ source: "Heja", error: heja.error });
   }
   const res = NextResponse.json(schedule);
-  if (hejaSession) res.cookies.set(HEJA_COOKIE, seal(hejaSession), cookieOpts(60 * 60 * 24 * 365));
+  if (hejaSession) await vaultSet(res, HEJA_COOKIE, hejaSession);
   return res;
 }

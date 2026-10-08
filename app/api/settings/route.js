@@ -3,26 +3,28 @@ import { checkToken } from "../../../lib/groupme";
 import { readSettings, writeSettings } from "../../../lib/settings";
 import { HEJA_COOKIE } from "../../../lib/heja";
 import { TS_COOKIE, teamsnapConfigured } from "../../../lib/teamsnap";
+import { sharedStorage, vaultGet } from "../../../lib/vault";
 
 export const dynamic = "force-dynamic";
 
-function summary(req, s) {
+async function summary(req, s) {
   return {
+    synced: sharedStorage(),
     feeds: s.feeds,
     groupme: Boolean(process.env.GROUPME_TOKEN || s.groupmeToken),
-    heja: Boolean(req.cookies.get(HEJA_COOKIE)),
-    teamsnap: { available: teamsnapConfigured(), connected: Boolean(req.cookies.get(TS_COOKIE)) },
+    heja: Boolean(await vaultGet(req, HEJA_COOKIE)),
+    teamsnap: { available: teamsnapConfigured(), connected: Boolean(await vaultGet(req, TS_COOKIE)) },
   };
 }
 
 export async function GET(req) {
-  return NextResponse.json(summary(req, readSettings(req)));
+  return NextResponse.json(await summary(req, await readSettings(req)));
 }
 
 // Body: { addFeed: {url, name?} } | { removeFeed: url } | { groupmeToken: string|null }
 export async function POST(req) {
   const body = await req.json().catch(() => ({}));
-  const s = readSettings(req);
+  const s = await readSettings(req);
   try {
     if (body.addFeed) {
       const url = String(body.addFeed.url || "").trim().replace(/^webcal:\/\//i, "https://");
@@ -43,7 +45,7 @@ export async function POST(req) {
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: 400 });
   }
-  const res = NextResponse.json(summary(req, s));
-  writeSettings(res, s);
+  const res = NextResponse.json(await summary(req, s));
+  await writeSettings(res, s);
   return res;
 }

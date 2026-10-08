@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { TS_COOKIE, exchangeCode, sealToken } from "../../../../lib/teamsnap";
+import { TS_COOKIE, exchangeCode } from "../../../../lib/teamsnap";
+import { vaultSet } from "../../../../lib/vault";
 
 export async function GET(req) {
   const url = new URL(req.url);
@@ -10,7 +11,7 @@ export async function GET(req) {
   try {
     const token = await exchangeCode(req, url.searchParams.get("code"));
     const res = NextResponse.redirect(new URL("/?tab=messages", req.url));
-    res.cookies.set(TS_COOKIE, sealToken(token), { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 365 });
+    await vaultSet(res, TS_COOKIE, token);
     res.cookies.delete("sh_ts_state");
     return res;
   } catch (e) {

@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 export async function GET(req, { params }) {
   const { groupId } = await params;
   try {
-    return NextResponse.json({ messages: await groupMessages(groupmeToken(req), groupId) });
+    return NextResponse.json({ messages: await groupMessages(await groupmeToken(req), groupId) });
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: 502 });
   }
@@ -18,7 +18,7 @@ export async function POST(req, { params }) {
   const { text } = await req.json().catch(() => ({}));
   if (!text?.trim()) return NextResponse.json({ error: "Message is empty" }, { status: 400 });
   try {
-    return NextResponse.json({ message: await sendGroupMessage(groupmeToken(req), groupId, text.trim().slice(0, 1000)) });
+    return NextResponse.json({ message: await sendGroupMessage(await groupmeToken(req), groupId, text.trim().slice(0, 1000)) });
   } catch (e) {
     return NextResponse.json({ error: e.message }, { status: 502 });
   }

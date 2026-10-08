@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { HEJA_COOKIE, HEJA_REF_COOKIE, verifyCode } from "../../../../lib/heja";
-import { cookieOpts, seal, unseal } from "../../../../lib/seal";
+import { unseal } from "../../../../lib/seal";
+import { vaultSet } from "../../../../lib/vault";
 
 export async function POST(req) {
   const { code } = await req.json().catch(() => ({}));
@@ -11,7 +12,7 @@ export async function POST(req) {
     const session = await verifyCode(ref, code);
     if (!session.refreshToken && !session.cookie) throw new Error("Heja signed in but didn't return a session");
     const res = NextResponse.json({ ok: true });
-    res.cookies.set(HEJA_COOKIE, seal(session), cookieOpts(60 * 60 * 24 * 365));
+    await vaultSet(res, HEJA_COOKIE, session);
     res.cookies.delete(HEJA_REF_COOKIE);
     return res;
   } catch (e) {
