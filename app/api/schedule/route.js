@@ -12,6 +12,7 @@ export async function GET(req) {
   const { feeds } = await readSettings(req);
   const hejaSaved = await vaultGet(req, HEJA_COOKIE);
   const pmSaved = await vaultGet(req, PM_COOKIE);
+  const pmBefore = JSON.stringify(pmSaved);
   let hejaSession = null;
   let pmSession = null;
   let pmError = null;
@@ -44,6 +45,6 @@ export async function GET(req) {
   if (pmError) schedule.errors.push({ source: "PlayMetrics", error: pmError });
   const res = NextResponse.json(schedule);
   if (hejaSession) await vaultSet(res, HEJA_COOKIE, hejaSession);
-  if (pmSession && pmSession !== pmSaved) await vaultSet(res, PM_COOKIE, pmSession);
+  if (pmSession && JSON.stringify(pmSession) !== pmBefore) await vaultSet(res, PM_COOKIE, pmSession);
   return res;
 }
