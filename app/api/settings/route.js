@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { checkToken } from "../../../lib/groupme";
 import { readSettings, readUploads, writeSettings } from "../../../lib/settings";
+import { calendarName } from "../../../lib/schedule";
 import { HEJA_COOKIE } from "../../../lib/heja";
 import { PM_COOKIE } from "../../../lib/playmetrics";
 import { REMIND_COOKIE } from "../../../lib/remind";
@@ -39,7 +40,8 @@ export async function POST(req) {
       const url = String(body.addFeed.url || "").trim().replace(/^webcal:\/\//i, "https://");
       if (!/^https?:\/\/\S+$/i.test(url)) throw new Error("That doesn't look like a calendar link");
       if (s.feeds.length >= 20) throw new Error("That's the most calendars this app can hold");
-      const name = String(body.addFeed.name || "").trim().slice(0, 60);
+      // Save the calendar's own title now so its color in Setup matches the Schedule.
+      const name = (String(body.addFeed.name || "").trim() || (await calendarName(url).catch(() => ""))).slice(0, 60);
       if (!s.feeds.some((f) => f.url === url)) s.feeds.push(name ? { url, name } : { url });
     }
     if (body.setStyle?.source) {

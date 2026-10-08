@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { loadSchedule } from "../../../lib/schedule";
-import { readSettings, readUploads } from "../../../lib/settings";
+import { readSettings, readUploads, writeSettings } from "../../../lib/settings";
 import { HEJA_COOKIE, ensureToken, loadHejaActivities } from "../../../lib/heja";
 import { PM_COOKIE, ensurePlaymetrics, playmetricsCalendars } from "../../../lib/playmetrics";
 import { TS1_COOKIE, loadTeamsnapOneEvents } from "../../../lib/teamsnapone";
@@ -10,7 +10,9 @@ export const dynamic = "force-dynamic";
 
 // Calendar links (built-in and ones added in Setup) plus Heja's schedule straight from Heja.
 export async function GET(req) {
-  const { feeds, styles } = await readSettings(req);
+  const settings = await readSettings(req);
+  const { feeds, styles } = settings;
+  const feedCopies = feeds.map((f) => ({ ...f }));
   const uploads = await readUploads(req);
   const hejaSaved = await vaultGet(req, HEJA_COOKIE);
   const pmSaved = await vaultGet(req, PM_COOKIE);
@@ -29,7 +31,7 @@ export async function GET(req) {
   const ts1 = ts1Session ? await loadTeamsnapOneEvents(ts1Session).catch((e) => ({ events: [], teams: [], error: e })) : null;
   const known = new Set(feeds.map((f) => f.url));
   const [schedule, heja] = await Promise.all([
-    loadSchedule({ extraFeeds: [...feeds.map((f) => ({ ...f })), ...uploads.map((u) => ({ name: u.name, ics: u.ics })), ...pmFeeds.filter((f) => !known.has(f.url))] }),
+    loadSchedule({ extraFeeds: [...feedCopies, ...uploads.map((u) => ({ name: u.name, ics: u.ics })), ...pmFeeds.filter((f) => !known.has(f.url))] }),
     hejaSaved
       ? ensureToken(hejaSaved)
           .then((s) => {
@@ -55,6 +57,10 @@ export async function GET(req) {
   }
   if (pmError) schedule.errors.push({ source: "PlayMetrics", error: pmError });
   const res = NextResponse.json({ ...schedule, styles });
+  // Remember names found for links saved without one, so Setup can show and color them.
+  if (feedCopies.some((f, i) => f.name && !feeds[i].name)) {
+    await writeSettings(res, { ...settings, feeds: feeds.map((f, i) => ({ ...f, name: f.name || feedCopies[i].name })) });
+  }
   if (hejaSession) await vaultSet(res, HEJA_COOKIE, hejaSession);
   if (ts1?.error?.status === 401) await vaultDelete(res, TS1_COOKIE);
   else if (ts1Session && JSON.stringify(ts1Session) !== ts1Before) await vaultSet(res, TS1_COOKIE, ts1Session);

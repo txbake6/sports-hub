@@ -479,7 +479,18 @@ function ConnectGroupMe({ connected, onChange }) {
   );
 }
 
-function CalendarLinks({ feeds, uploads = [], onChange }) {
+// A color swatch that saves the color for one schedule source.
+function ColorPick({ source, styles, onChange }) {
+  return (
+    <input type="color" value={styleFor(source, styles).color} aria-label={`Color for ${source}`}
+      onChange={async (e) => { try { onChange(await postJSON("/api/settings", { setStyle: { source, color: e.target.value } })); } catch {} }}
+      style={{ width: 32, height: 28, padding: 0, border: "none", background: "none", flex: "none", cursor: "pointer" }} />
+  );
+}
+
+const feedName = (f) => f.name || new URL(f.url).hostname.replace(/^www\./, "");
+
+function CalendarLinks({ feeds, uploads = [], styles = {}, onChange }) {
   const [url, setUrl] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -497,10 +508,11 @@ function CalendarLinks({ feeds, uploads = [], onChange }) {
   return (
     <div className="card">
       <div className="title">Other calendars</div>
-      <div className="meta">For any app that isn't connected, paste its calendar "subscribe" or "sync" link.</div>
+      <div className="meta">For any app that isn't connected, paste its calendar "subscribe" or "sync" link. Tap a color square to change that calendar's color.</div>
       {feeds.map((f) => (
-        <div className="row" key={f.url} style={{ justifyContent: "space-between", marginTop: 6 }}>
-          <span className="meta ellipsis grow">{f.name || new URL(f.url).hostname}</span>
+        <div className="row" key={f.url} style={{ justifyContent: "space-between", marginTop: 6, gap: 8 }}>
+          <ColorPick source={feedName(f)} styles={styles} onChange={onChange} />
+          <span className="meta ellipsis grow">{feedName(f)}</span>
           <button className="link" onClick={() => send({ removeFeed: f.url })} disabled={busy}>Remove</button>
         </div>
       ))}
@@ -510,7 +522,8 @@ function CalendarLinks({ feeds, uploads = [], onChange }) {
       </form>
       <div className="meta" style={{ marginTop: 12 }}>Or upload an .ics file. An upload is a snapshot, so upload it again when the schedule changes. A link stays up to date by itself.</div>
       {uploads.map((u) => (
-        <div className="row" key={u.id} style={{ justifyContent: "space-between", marginTop: 6 }}>
+        <div className="row" key={u.id} style={{ justifyContent: "space-between", marginTop: 6, gap: 8 }}>
+          <ColorPick source={u.name} styles={styles} onChange={onChange} />
           <span className="meta ellipsis grow">📎 {u.name}</span>
           <button className="link" disabled={busy} onClick={async () => { await fetch(`/api/calendars?id=${encodeURIComponent(u.id)}`, { method: "DELETE" }); onChange(await getJSON("/api/settings")); }}>Remove</button>
         </div>
@@ -617,7 +630,7 @@ function Setup() {
           {!s.teamsnap.connected && <p style={{ margin: "6px 0 0" }}><a className="btn" href="/api/teamsnap/connect" style={{ textDecoration: "none", display: "inline-block" }}>Connect TeamSnap</a></p>}
         </div>
       )}
-      <CalendarLinks feeds={s.feeds} uploads={s.uploads} onChange={setS} />
+      <CalendarLinks feeds={s.feeds} uploads={s.uploads} styles={s.styles || {}} onChange={setS} />
       <ScheduleColors styles={s.styles || {}} onChange={setS} />
     </div>
   );
