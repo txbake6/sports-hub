@@ -13,6 +13,9 @@ header.top { position: sticky; top: 0; z-index: 5; background: var(--bg); paddin
 h1 { font-size: 20px; margin: 0 0 10px; }
 .tabs { display: flex; gap: 6px; }
 .tabs button { flex: 1; padding: 9px; border: 1px solid var(--line); background: var(--card); color: var(--text); border-radius: 10px; cursor: pointer; }
+.subtabs { margin-bottom: 4px; }
+.tabs.subtabs button { padding: 6px; font-size: 14px; }
+.tabs.subtabs button.on { background: var(--card); color: var(--accent); border-color: var(--accent); font-weight: 600; }
 .tabs button.on { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
 .day { margin: 18px 0 6px; font-weight: 600; color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: .03em; }
 .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; }

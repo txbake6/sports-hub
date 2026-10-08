@@ -359,6 +359,7 @@ function Messages() {
   const [open, setOpen] = useState(null);
   const [reload, setReload] = useState(0);
   const [seen, setSeen] = useState(null);
+  const [section, setSection] = useState("chats");
 
   useEffect(() => {
     if (open) return;
@@ -397,7 +398,13 @@ function Messages() {
     .map((item) => ({ ...item, isNew: isNew(item) }))
     // New messages first, then everything else, newest first within each.
     .sort((a, b) => (b.isNew - a.isNew) || b.at.localeCompare(a.at));
-  const newCount = feed.filter((i) => i.isNew).length;
+  // Chats are conversations you can reply in. Posts are Heja posts and club announcements.
+  const isChat = (i) => ["groupme", "playmetrics", "remind", "teamsnapone"].includes(i.kind);
+  const chats = feed.filter(isChat);
+  const posts = feed.filter((i) => !isChat(i));
+  const shown = section === "chats" ? chats : posts;
+  const newIn = (list) => list.filter((i) => i.isNew).length;
+  const newCount = newIn(shown);
 
   return (
     <div className="chatlist" style={{ marginTop: 12 }}>
@@ -407,9 +414,13 @@ function Messages() {
       {pm.error && <p className="err">PlayMetrics: {pm.error}</p>}
       {rm.error && <p className="err">Remind: {rm.error}</p>}
       {ts1.error && <p className="err">TeamSnap ONE: {ts1.error}</p>}
-      {!feed.length && <p className="empty">No messages yet. Connect your apps in the Setup tab.</p>}
-      {feed.length > 0 && <div className="day">{newCount ? `${newCount} new` : "All caught up"}</div>}
-      {feed.map((item) =>
+      <div className="tabs subtabs">
+        <button className={section === "chats" ? "on" : ""} onClick={() => setSection("chats")}>Chats{newIn(chats) ? ` · ${newIn(chats)} new` : ""}</button>
+        <button className={section === "posts" ? "on" : ""} onClick={() => setSection("posts")}>Posts{newIn(posts) ? ` · ${newIn(posts)} new` : ""}</button>
+      </div>
+      {!shown.length && <p className="empty">{section === "chats" ? "No chats yet. Connect your apps in the Setup tab." : "No posts yet. Heja posts and club announcements show up here."}</p>}
+      {shown.length > 0 && <div className="day">{newCount ? `${newCount} new` : "All caught up"}</div>}
+      {shown.map((item) =>
         item.kind === "groupme" || item.kind === "playmetrics" || item.kind === "remind" || item.kind === "teamsnapone" ? (
           <div className={`card${item.isNew ? " new" : ""}`} key={item.id} onClick={() => openItem(item)}>
             {item.image ? <img className="avatar" src={`${item.image}.avatar`} alt="" /> : <div className="avatar" />}
