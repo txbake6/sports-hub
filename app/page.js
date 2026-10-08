@@ -32,7 +32,7 @@ function Schedule() {
 
   if (error) return <p className="err">{error}</p>;
   if (!data) return <p className="empty">Loading schedules…</p>;
-  if (!data.sources.length) return <p className="empty">No calendar links yet. Add them to CALENDAR_FEEDS.</p>;
+  if (!data.sources.length) return <p className="empty">No schedules yet. Connect Heja or add a calendar link in the Setup tab.</p>;
 
   const startOfToday = new Date().setHours(0, 0, 0, 0);
   const events = data.events.filter(
@@ -301,12 +301,7 @@ function Messages() {
       {gmError && <p className="err">GroupMe: {gmError}</p>}
       {updates.errors?.map((e) => <p key={e.source} className="err">{e.source}: {e.error}</p>)}
       {heja.error && heja.connected !== false && <p className="err">Heja: {heja.error}</p>}
-      {!heja.connected && <ConnectHeja onDone={() => setReload((n) => n + 1)} />}
-      {updates.teamsnap?.available && !updates.teamsnap.connected && (
-        <p><a className="btn" href="/api/teamsnap/connect" style={{ textDecoration: "none", display: "inline-block" }}>Connect TeamSnap</a></p>
-      )}
-      {updates.email === false && <p className="meta">Gmail isn't connected, so the email backup is off.</p>}
-      {!feed.length && <p className="empty">No messages yet.</p>}
+      {!feed.length && <p className="empty">No messages yet. Connect your apps in the Setup tab.</p>}
       {feed.map((item) =>
         item.kind === "groupme" ? (
           <div className="card" key={item.id} onClick={() => setOpen(item)}>
@@ -338,10 +333,117 @@ function Messages() {
   );
 }
 
+const inputStyle = { padding: "8px 10px", borderRadius: 10, border: "1px solid var(--line)", background: "var(--card)", color: "var(--text)", minWidth: 0 };
+
+function ConnectGroupMe({ connected, onChange }) {
+  const [token, setToken] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  async function save(value) {
+    setBusy(true);
+    setError("");
+    try {
+      onChange(await postJSON("/api/settings", { groupmeToken: value }));
+      setToken("");
+    } catch (e) {
+      setError(e.message);
+    }
+    setBusy(false);
+  }
+  return (
+    <div className="card">
+      <div className="row" style={{ justifyContent: "space-between" }}>
+        <span className="title">GroupMe</span>
+        <span className="meta">{connected ? "Connected" : "Not connected"}</span>
+      </div>
+      {connected ? (
+        <p style={{ margin: "6px 0 0" }}><button className="link" onClick={() => save(null)} disabled={busy}>Disconnect</button></p>
+      ) : (
+        <form onSubmit={(e) => { e.preventDefault(); save(token); }}>
+          <div className="meta">Sign in at <a href="https://dev.groupme.com" target="_blank" rel="noreferrer">dev.groupme.com</a>, tap <b>Access Token</b> at the top, and paste it here.</div>
+          <div className="row" style={{ marginTop: 8 }}>
+            <input className="grow" style={inputStyle} placeholder="GroupMe access token" value={token} onChange={(e) => setToken(e.target.value)} />
+            <button className="btn" disabled={busy || !token.trim()}>Connect</button>
+          </div>
+        </form>
+      )}
+      {error && <p className="err">{error}</p>}
+    </div>
+  );
+}
+
+function CalendarLinks({ feeds, onChange }) {
+  const [url, setUrl] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  async function send(body) {
+    setBusy(true);
+    setError("");
+    try {
+      onChange(await postJSON("/api/settings", body));
+      setUrl("");
+    } catch (e) {
+      setError(e.message);
+    }
+    setBusy(false);
+  }
+  return (
+    <div className="card">
+      <div className="title">Other calendars</div>
+      <div className="meta">For any app that isn't connected, paste its calendar "subscribe" or "sync" link.</div>
+      {feeds.map((f) => (
+        <div className="row" key={f.url} style={{ justifyContent: "space-between", marginTop: 6 }}>
+          <span className="meta ellipsis grow">{f.name || new URL(f.url).hostname}</span>
+          <button className="link" onClick={() => send({ removeFeed: f.url })} disabled={busy}>Remove</button>
+        </div>
+      ))}
+      <form className="row" style={{ marginTop: 8 }} onSubmit={(e) => { e.preventDefault(); send({ addFeed: { url } }); }}>
+        <input className="grow" style={inputStyle} placeholder="webcal:// or https:// link" value={url} onChange={(e) => setUrl(e.target.value)} />
+        <button className="btn" disabled={busy || !url.trim()}>Add</button>
+      </form>
+      {error && <p className="err">{error}</p>}
+    </div>
+  );
+}
+
+function Setup() {
+  const [s, setS] = useState(null);
+  const [error, setError] = useState("");
+  const load = () => getJSON("/api/settings").then(setS).catch((e) => setError(e.message));
+  useEffect(() => { load(); }, []);
+  if (error) return <p className="err">{error}</p>;
+  if (!s) return <p className="empty">Loading…</p>;
+  return (
+    <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
+      <p className="meta" style={{ margin: 0 }}>Connect each app once on this phone or computer. Your sign-ins stay saved in this browser.</p>
+      {s.heja ? (
+        <div className="card"><div className="row" style={{ justifyContent: "space-between" }}><span className="title">Heja</span>
+          <button className="link" onClick={async () => { await fetch("/api/heja", { method: "DELETE" }); load(); }}>Disconnect</button></div>
+          <div className="meta">Posts, comments and schedule</div></div>
+      ) : (
+        <ConnectHeja onDone={load} />
+      )}
+      <ConnectGroupMe connected={s.groupme} onChange={setS} />
+      <div className="card">
+        <div className="row" style={{ justifyContent: "space-between" }}><span className="title">PlayMetrics</span><span className="meta">Coming next</span></div>
+        <div className="meta">Team chat is built. Sign-in comes once the second recording arrives.</div>
+      </div>
+      {s.teamsnap.available && (
+        <div className="card">
+          <div className="row" style={{ justifyContent: "space-between" }}><span className="title">TeamSnap</span><span className="meta">{s.teamsnap.connected ? "Connected" : "Not connected"}</span></div>
+          {!s.teamsnap.connected && <p style={{ margin: "6px 0 0" }}><a className="btn" href="/api/teamsnap/connect" style={{ textDecoration: "none", display: "inline-block" }}>Connect TeamSnap</a></p>}
+        </div>
+      )}
+      <CalendarLinks feeds={s.feeds} onChange={setS} />
+    </div>
+  );
+}
+
 export default function Home() {
   const [tab, setTab] = useState("schedule");
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("tab") === "messages") setTab("messages");
+    const t = new URLSearchParams(window.location.search).get("tab");
+    if (t === "messages" || t === "setup") setTab(t);
   }, []);
   return (
     <>
@@ -350,9 +452,10 @@ export default function Home() {
         <div className="tabs">
           <button className={tab === "schedule" ? "on" : ""} onClick={() => setTab("schedule")}>Schedule</button>
           <button className={tab === "messages" ? "on" : ""} onClick={() => setTab("messages")}>Messages</button>
+          <button className={tab === "setup" ? "on" : ""} onClick={() => setTab("setup")}>Setup</button>
         </div>
       </header>
-      <main className="wrap">{tab === "schedule" ? <Schedule /> : <Messages />}</main>
+      <main className="wrap">{tab === "schedule" ? <Schedule /> : tab === "messages" ? <Messages /> : <Setup />}</main>
     </>
   );
 }
