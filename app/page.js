@@ -656,7 +656,12 @@ export default function Home() {
   return (
     <>
       <header className="top">
-        <h1>Sports Hub</h1>
+        <div className="row" style={{ justifyContent: "space-between", marginBottom: 10 }}>
+          <h1 style={{ margin: 0 }}>Sports Hub</h1>
+          {/* A home-screen app has no reload button, so this one fetches the latest app and data. */}
+          <button className="refresh" aria-label="Refresh" title="Refresh"
+            onClick={() => window.location.replace(`/?tab=${tab}&r=${Date.now()}`)}>↻</button>
+        </div>
         <div className="tabs">
           <button className={tab === "schedule" ? "on" : ""} onClick={() => setTab("schedule")}>Schedule</button>
           <button className={tab === "messages" ? "on" : ""} onClick={() => setTab("messages")}>Messages</button>
